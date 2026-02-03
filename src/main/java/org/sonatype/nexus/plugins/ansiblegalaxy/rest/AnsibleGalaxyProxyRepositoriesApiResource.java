@@ -25,7 +25,7 @@ import static org.sonatype.nexus.rest.ApiDocConstants.REPOSITORY_UPDATED;
 public abstract class AnsibleGalaxyProxyRepositoriesApiResource
     extends AbstractProxyRepositoriesApiResource<AnsibleGalaxyProxyRepositoryApiRequest>
 {
-  @ApiOperation("Create ansible-galaxy proxy repository")
+  @ApiOperation("Create Ansible Galaxy proxy repository")
   @ApiResponses(value = {
       @ApiResponse(code = 201, message = REPOSITORY_CREATED),
       @ApiResponse(code = 401, message = AUTHENTICATION_REQUIRED),
@@ -37,7 +37,7 @@ public abstract class AnsibleGalaxyProxyRepositoriesApiResource
     return super.createRepository(request);
   }
 
-  @ApiOperation("Update ansible-galaxy proxy repository")
+  @ApiOperation("Update Ansible Galaxy proxy repository")
   @ApiResponses(value = {
       @ApiResponse(code = 204, message = REPOSITORY_UPDATED),
       @ApiResponse(code = 400, message = BAD_REQUEST),

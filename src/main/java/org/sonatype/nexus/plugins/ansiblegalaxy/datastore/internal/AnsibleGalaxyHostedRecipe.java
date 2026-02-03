@@ -52,7 +52,7 @@ import static org.sonatype.nexus.repository.http.HttpMethods.*;
 public class AnsibleGalaxyHostedRecipe
     extends RecipeSupport
 {
-  public static final String NAME = "ansible-galaxy-hosted";
+  public static final String NAME = "ansiblegalaxy-hosted";
 
   private static final String PREFIX = "/api/v3/plugin/ansible/content/published";
 

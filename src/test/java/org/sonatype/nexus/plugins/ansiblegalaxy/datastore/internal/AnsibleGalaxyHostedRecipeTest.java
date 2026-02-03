@@ -72,7 +72,7 @@ public class AnsibleGalaxyHostedRecipeTest
 
   @Test
   public void recipeNameIsCorrect() {
-    assertThat(AnsibleGalaxyHostedRecipe.NAME, is("ansible-galaxy-hosted"));
+    assertThat(AnsibleGalaxyHostedRecipe.NAME, is("ansiblegalaxy-hosted"));
   }
 
   @Test

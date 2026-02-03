@@ -6,9 +6,9 @@ import org.sonatype.nexus.plugins.ansiblegalaxy.internal.AnsibleGalaxyFormat;
 import org.sonatype.nexus.repository.content.store.FormatStoreModule;
 
 @Named(AnsibleGalaxyFormat.NAME)
-public class AnsibleGalaxyStoreModule
-    extends FormatStoreModule<AnsibleGalaxyContentRepositoryDAO,
-                              AnsibleGalaxyComponentDAO,
-                              AnsibleGalaxyAssetDAO,
-                              AnsibleGalaxyAssetBlobDAO> {
+public class AnsiblegalaxyStoreModule
+    extends FormatStoreModule<AnsiblegalaxyContentRepositoryDAO,
+                              AnsiblegalaxyComponentDAO,
+                              AnsiblegalaxyAssetDAO,
+                              AnsiblegalaxyAssetBlobDAO> {
 }
