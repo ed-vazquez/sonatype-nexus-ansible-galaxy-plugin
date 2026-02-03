@@ -116,7 +116,7 @@ section_close
 section_open "Creating ansible-galaxy-hosted repository"
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
   -u "$AUTH" \
-  -X POST "http://localhost:$NEXUS_PORT/service/rest/v1/repositories/ansible-galaxy/hosted" \
+  -X POST "http://localhost:$NEXUS_PORT/service/rest/v1/repositories/ansiblegalaxy/hosted" \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "galaxy-test",
