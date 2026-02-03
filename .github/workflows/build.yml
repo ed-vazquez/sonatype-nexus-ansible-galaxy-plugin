@@ -32,7 +32,7 @@ jobs:
         run: mvn clean verify -s .mvn/maven-settings.xml
 
       - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: plugin-jar
           path: target/nexus-repository-ansiblegalaxy-*.jar
