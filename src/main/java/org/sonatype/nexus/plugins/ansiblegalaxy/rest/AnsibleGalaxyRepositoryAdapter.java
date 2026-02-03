@@ -9,6 +9,7 @@ import org.sonatype.nexus.repository.rest.api.SimpleApiRepositoryAdapter;
 import org.sonatype.nexus.repository.rest.api.model.AbstractApiRepository;
 import org.sonatype.nexus.repository.routing.RoutingRuleStore;
 import org.sonatype.nexus.repository.types.HostedType;
+import org.sonatype.nexus.repository.types.ProxyType;
 
 @Named(AnsibleGalaxyFormat.NAME)
 public class AnsibleGalaxyRepositoryAdapter
@@ -29,6 +30,18 @@ public class AnsibleGalaxyRepositoryAdapter
           getHostedStorageAttributes(repository),
           getCleanupPolicyAttributes(repository),
           getComponentAttributes(repository));
+    }
+    if (ProxyType.NAME.equals(repository.getType().toString())) {
+      return new AnsibleGalaxyProxyApiRepository(
+          repository.getName(),
+          repository.getUrl(),
+          repository.getConfiguration().isOnline(),
+          getStorageAttributes(repository),
+          getCleanupPolicyAttributes(repository),
+          getProxyAttributes(repository),
+          getNegativeCacheAttributes(repository),
+          getHttpClientAttributes(repository),
+          getRoutingRuleName(repository));
     }
     return super.adapt(repository);
   }
