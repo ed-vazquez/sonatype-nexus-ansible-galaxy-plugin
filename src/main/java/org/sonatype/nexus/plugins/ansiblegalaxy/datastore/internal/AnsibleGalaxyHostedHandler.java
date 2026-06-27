@@ -1,6 +1,11 @@
 package org.sonatype.nexus.plugins.ansiblegalaxy.datastore.internal;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,6 +26,7 @@ import org.sonatype.nexus.repository.view.Handler;
 import org.sonatype.nexus.repository.view.Payload;
 import org.sonatype.nexus.repository.view.Response;
 import org.sonatype.nexus.repository.view.matchers.token.TokenMatcher;
+import org.sonatype.nexus.repository.view.payloads.StreamPayload;
 import org.sonatype.nexus.repository.view.payloads.StringPayload;
 
 import static org.sonatype.nexus.repository.http.HttpMethods.*;
@@ -109,6 +115,9 @@ public class AnsibleGalaxyHostedHandler
 
   /**
    * Route 1: POST /api/v3/artifacts/collections/ - Upload collection tar.gz
+   *
+   * Accepts both raw binary uploads (Content-Type: application/gzip) and
+   * multipart/form-data uploads (as sent by ansible-galaxy collection publish).
    */
   private Response handleUpload(final Context context,
                                 final AnsibleGalaxyContentFacet contentFacet) throws IOException {
@@ -117,8 +126,82 @@ public class AnsibleGalaxyHostedHandler
       return HttpResponses.badRequest("Request body is required");
     }
 
+    String contentType = payload.getContentType();
+    if (contentType != null && contentType.startsWith("multipart/form-data")) {
+      payload = extractFileFromMultipart(payload);
+    }
+
     contentFacet.putCollection(payload);
     return HttpResponses.created();
+  }
+
+  /**
+   * Extracts the file part from a multipart/form-data request body.
+   */
+  private Payload extractFileFromMultipart(final Payload payload) throws IOException {
+    String contentType = payload.getContentType();
+    String boundary = null;
+    for (String part : contentType.split(";")) {
+      part = part.trim();
+      if (part.startsWith("boundary=")) {
+        boundary = part.substring("boundary=".length());
+        if (boundary.startsWith("\"") && boundary.endsWith("\"")) {
+          boundary = boundary.substring(1, boundary.length() - 1);
+        }
+        break;
+      }
+    }
+    if (boundary == null) {
+      throw new IOException("No boundary found in multipart Content-Type");
+    }
+
+    byte[] body;
+    try (InputStream is = payload.openInputStream();
+         ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+      byte[] buffer = new byte[8192];
+      int read;
+      while ((read = is.read(buffer)) != -1) {
+        baos.write(buffer, 0, read);
+      }
+      body = baos.toByteArray();
+    }
+    byte[] headerEnd = "\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1);
+    byte[] closingBoundary = ("\r\n--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
+
+    // Find end of the first part's headers
+    int headersEnd = indexOf(body, headerEnd, 0);
+    if (headersEnd < 0) {
+      throw new IOException("Could not find end of multipart part headers");
+    }
+    int contentStart = headersEnd + headerEnd.length;
+
+    // Find the closing boundary after the content
+    int contentEnd = indexOf(body, closingBoundary, contentStart);
+    if (contentEnd < 0) {
+      throw new IOException("Could not find closing multipart boundary");
+    }
+
+    byte[] fileContent = Arrays.copyOfRange(body, contentStart, contentEnd);
+    return new StreamPayload(
+        () -> new ByteArrayInputStream(fileContent),
+        fileContent.length,
+        "application/gzip");
+  }
+
+  private static int indexOf(final byte[] haystack, final byte[] needle, final int start) {
+    for (int i = start; i <= haystack.length - needle.length; i++) {
+      boolean match = true;
+      for (int j = 0; j < needle.length; j++) {
+        if (haystack[i + j] != needle[j]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   /**

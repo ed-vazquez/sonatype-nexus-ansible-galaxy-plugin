@@ -116,7 +116,7 @@ section_close
 section_open "Creating ansible-galaxy-hosted repository"
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
   -u "$AUTH" \
-  -X POST "http://localhost:$NEXUS_PORT/service/rest/v1/repositories/ansible-galaxy/hosted" \
+  -X POST "http://localhost:$NEXUS_PORT/service/rest/v1/repositories/ansiblegalaxy/hosted" \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "galaxy-test",
@@ -206,7 +206,7 @@ HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
   "$API_PREFIX/collections/index/")
 assert_status 200 "$HTTP_CODE" "GET list collections"
 
-if command -v python3 >/dev/null 2>&1; then
+if python3 --version 2>/dev/null >/dev/null 2>&1; then
   VALIDATION=$(python3 -c "
 import json, sys
 with open('$RESPONSE_FILE') as f:
@@ -236,7 +236,7 @@ HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
   "$API_PREFIX/collections/index/testns/testcol/")
 assert_status 200 "$HTTP_CODE" "GET collection detail testns/testcol"
 
-if command -v python3 >/dev/null 2>&1; then
+if python3 --version 2>/dev/null >/dev/null 2>&1; then
   VALIDATION=$(python3 -c "
 import json, sys
 with open('$RESPONSE_FILE') as f:
@@ -267,7 +267,7 @@ HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
   "$API_PREFIX/collections/index/testns/testcol/versions/")
 assert_status 200 "$HTTP_CODE" "GET list versions testns/testcol"
 
-if command -v python3 >/dev/null 2>&1; then
+if python3 --version 2>/dev/null >/dev/null 2>&1; then
   VALIDATION=$(python3 -c "
 import json, sys
 with open('$RESPONSE_FILE') as f:
@@ -296,7 +296,7 @@ HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
   "$API_PREFIX/collections/index/testns/testcol/versions/1.0.0/")
 assert_status 200 "$HTTP_CODE" "GET version detail testns/testcol/1.0.0"
 
-if command -v python3 >/dev/null 2>&1; then
+if python3 --version 2>/dev/null >/dev/null 2>&1; then
   VALIDATION=$(python3 -c "
 import json, sys
 with open('$RESPONSE_FILE') as f:
@@ -373,7 +373,7 @@ assert_status 404 "$HTTP_CODE" "GET deleted artifact returns 404"
 # Verify version list no longer includes deleted version
 HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
   "$API_PREFIX/collections/index/testns/testcol/versions/")
-if command -v python3 >/dev/null 2>&1; then
+if python3 --version 2>/dev/null >/dev/null 2>&1; then
   HAS_200=$(python3 -c "
 import json
 with open('$RESPONSE_FILE') as f:

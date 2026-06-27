@@ -78,7 +78,7 @@ public class AnsibleGalaxyProxyRecipeTest
 
   @Test
   public void recipeNameIsCorrect() {
-    assertThat(AnsibleGalaxyProxyRecipe.NAME, is("ansible-galaxy-proxy"));
+    assertThat(AnsibleGalaxyProxyRecipe.NAME, is("ansiblegalaxy-proxy"));
   }
 
   @Test

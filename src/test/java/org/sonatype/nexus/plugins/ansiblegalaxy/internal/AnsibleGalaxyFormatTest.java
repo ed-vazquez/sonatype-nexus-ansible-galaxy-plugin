@@ -13,12 +13,12 @@ public class AnsibleGalaxyFormatTest
   @Test
   public void formatNameIsAnsibleGalaxy() {
     AnsibleGalaxyFormat format = new AnsibleGalaxyFormat();
-    assertThat(format.getValue(), is("ansible-galaxy"));
+    assertThat(format.getValue(), is("ansiblegalaxy"));
   }
 
   @Test
   public void nameConstantMatchesValue() {
-    assertThat(AnsibleGalaxyFormat.NAME, is("ansible-galaxy"));
+    assertThat(AnsibleGalaxyFormat.NAME, is("ansiblegalaxy"));
     AnsibleGalaxyFormat format = new AnsibleGalaxyFormat();
     assertThat(format.getValue(), is(AnsibleGalaxyFormat.NAME));
   }
