@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
 #
-# Integration test for the Ansible Galaxy hosted repository plugin.
+# Integration tests for the Ansible Galaxy repository plugin (hosted + proxy).
 #
 # Builds the plugin, installs it into a Nexus 3 Docker container,
-# and runs HTTP-level tests against Galaxy v3 API endpoints:
+# and runs HTTP-level tests against Galaxy v3 API endpoints.
+#
+# Hosted tests:
 #   - Create ansible-galaxy-hosted repository via REST API
 #   - Upload a collection tar.gz
-#   - List collections
-#   - Get collection detail
-#   - List versions
-#   - Get version detail (includes download_url)
+#   - List collections, collection detail, version list, version detail
 #   - Download artifact and verify checksum
 #   - Delete version and verify 404
+#
+# Proxy tests:
+#   - Create ansible-galaxy-proxy repository pointing at galaxy.ansible.com
+#   - API root discovery
+#   - Version list via short-form URL, verify URL rewriting
+#   - Version detail, verify download_url is rewritten to proxy
+#   - Download artifact through proxy (upstream fetch)
+#   - Download again (verify served from cache with matching checksum)
+#   - Version list via long-form URL
 #
 # Usage: ./src/test/integration/run-it.sh
 #
@@ -387,6 +395,243 @@ print('2.0.0' not in versions)
     fail "Version list still includes deleted version 2.0.0"
   fi
 fi
+section_close
+
+######################################################################
+# Proxy repository tests
+######################################################################
+
+section_open "Creating ansible-galaxy-proxy repository"
+HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+  -u "$AUTH" \
+  -X POST "http://localhost:$NEXUS_PORT/service/rest/v1/repositories/ansible-galaxy/proxy" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "galaxy-proxy-test",
+    "online": true,
+    "storage": {
+      "blobStoreName": "default",
+      "strictContentTypeValidation": false
+    },
+    "proxy": {
+      "remoteUrl": "https://galaxy.ansible.com",
+      "contentMaxAge": 1440,
+      "metadataMaxAge": 1440
+    },
+    "negativeCache": {
+      "enabled": true,
+      "timeToLive": 1440
+    },
+    "httpClient": {
+      "blocked": false,
+      "autoBlock": true
+    }
+  }')
+
+if [ "$HTTP_CODE" -eq 201 ] || [ "$HTTP_CODE" -eq 200 ]; then
+  pass "Create proxy repository (HTTP $HTTP_CODE)"
+else
+  fail "Create proxy repository — HTTP $HTTP_CODE"
+  echo "Checking Nexus logs for plugin errors:"
+  docker logs "$CONTAINER_NAME" 2>&1 | grep -i -E '(ansible|galaxy|proxy|ERROR|WARN.*bundle)' | tail -20
+  section_close
+  echo ""
+  echo "Results: $PASSED passed, $FAILED failed"
+  exit 1
+fi
+
+PROXY_URL="http://localhost:$NEXUS_PORT/repository/galaxy-proxy-test"
+PROXY_PREFIX="$PROXY_URL/api/v3/plugin/ansible/content/published"
+section_close
+
+# Use a small, well-known collection for proxy tests
+PROXY_NS="ansible"
+PROXY_NAME="netcommon"
+
+section_open "Test: Proxy API root discovery"
+HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
+  "$PROXY_URL/api/")
+assert_status 200 "$HTTP_CODE" "GET proxy /api/ root"
+
+if command -v python3 >/dev/null 2>&1; then
+  VALIDATION=$(python3 -c "
+import json, sys
+with open('$RESPONSE_FILE') as f:
+    r = json.load(f)
+errors = []
+av = r.get('available_versions', {})
+if 'v3' not in av:
+    errors.append('missing v3 in available_versions')
+if errors:
+    print('FAIL: ' + '; '.join(errors))
+    sys.exit(1)
+print('OK')
+" 2>&1)
+  if [ "$?" -eq 0 ]; then
+    pass "API root JSON structure is valid"
+  else
+    fail "API root validation: $VALIDATION"
+  fi
+fi
+section_close
+
+section_open "Test: Proxy version list (short-form URL)"
+HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
+  "$PROXY_URL/api/v3/collections/$PROXY_NS/$PROXY_NAME/versions/?limit=5")
+assert_status 200 "$HTTP_CODE" "GET proxy version list $PROXY_NS/$PROXY_NAME"
+
+if command -v python3 >/dev/null 2>&1; then
+  VALIDATION=$(python3 -c "
+import json, sys
+with open('$RESPONSE_FILE') as f:
+    r = json.load(f)
+errors = []
+if r.get('meta', {}).get('count', 0) < 1:
+    errors.append('count should be >= 1')
+data = r.get('data', [])
+if len(data) < 1:
+    errors.append('data should have at least 1 version')
+# Verify URLs are rewritten to point at proxy, not galaxy.ansible.com
+for item in data:
+    href = item.get('href', '')
+    if 'galaxy.ansible.com' in href:
+        errors.append(f'href not rewritten: {href}')
+        break
+links = r.get('links', {})
+for link_name in ['first', 'last', 'next']:
+    link = links.get(link_name, '')
+    if link and 'galaxy.ansible.com' in link:
+        errors.append(f'pagination link {link_name} not rewritten: {link}')
+        break
+if errors:
+    print('FAIL: ' + '; '.join(errors))
+    sys.exit(1)
+print('OK')
+" 2>&1)
+  if [ "$?" -eq 0 ]; then
+    pass "Proxy version list JSON is valid with rewritten URLs"
+  else
+    fail "Proxy version list validation: $VALIDATION"
+  fi
+fi
+section_close
+
+section_open "Test: Proxy version detail (short-form URL)"
+# Get the first version from the version list
+if command -v python3 >/dev/null 2>&1; then
+  PROXY_VERSION=$(python3 -c "
+import json
+with open('$RESPONSE_FILE') as f:
+    r = json.load(f)
+data = r.get('data', [])
+if data:
+    print(data[0].get('version', ''))
+" 2>&1)
+else
+  PROXY_VERSION="2.0.0"
+fi
+
+if [ -n "$PROXY_VERSION" ]; then
+  HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
+    "$PROXY_URL/api/v3/collections/$PROXY_NS/$PROXY_NAME/versions/$PROXY_VERSION/")
+  assert_status 200 "$HTTP_CODE" "GET proxy version detail $PROXY_NS/$PROXY_NAME/$PROXY_VERSION"
+
+  if command -v python3 >/dev/null 2>&1; then
+    VALIDATION=$(python3 -c "
+import json, sys
+with open('$RESPONSE_FILE') as f:
+    r = json.load(f)
+errors = []
+if r.get('version') != '$PROXY_VERSION':
+    errors.append(f\"version: expected '$PROXY_VERSION', got '{r.get('version')}'\")
+download_url = r.get('download_url', '')
+if not download_url:
+    errors.append('missing download_url')
+elif 'galaxy.ansible.com' in download_url:
+    errors.append(f'download_url not rewritten: {download_url}')
+elif 'galaxy-proxy-test' not in download_url:
+    errors.append(f'download_url does not point to proxy repo: {download_url}')
+href = r.get('href', '')
+if href and 'galaxy.ansible.com' in href:
+    errors.append(f'href not rewritten: {href}')
+if errors:
+    print('FAIL: ' + '; '.join(errors))
+    sys.exit(1)
+print('OK')
+" 2>&1)
+    if [ "$?" -eq 0 ]; then
+      pass "Proxy version detail has rewritten download_url"
+    else
+      fail "Proxy version detail validation: $VALIDATION"
+    fi
+    echo "  Version detail content:"
+    python3 -m json.tool "$RESPONSE_FILE" 2>/dev/null | head -20 | sed 's/^/    /'
+  fi
+else
+  fail "Could not determine proxy version to test"
+fi
+section_close
+
+section_open "Test: Proxy artifact download (first request — upstream fetch)"
+# Extract download path from version detail
+if command -v python3 >/dev/null 2>&1; then
+  ARTIFACT_PATH=$(python3 -c "
+import json
+with open('$RESPONSE_FILE') as f:
+    r = json.load(f)
+url = r.get('download_url', '')
+# Extract path after the repo URL
+prefix = 'http://localhost:$NEXUS_PORT/repository/galaxy-proxy-test'
+if url.startswith(prefix):
+    print(url[len(prefix):])
+" 2>&1)
+fi
+
+if [ -n "${ARTIFACT_PATH:-}" ]; then
+  PROXY_DOWNLOAD=$(mktemp)
+  HTTP_CODE=$(curl -s -o "$PROXY_DOWNLOAD" -w '%{http_code}' \
+    "$PROXY_URL$ARTIFACT_PATH")
+  assert_status 200 "$HTTP_CODE" "GET proxy artifact download (first request)"
+
+  PROXY_SHA256=$(shasum -a 256 "$PROXY_DOWNLOAD" 2>/dev/null || sha256sum "$PROXY_DOWNLOAD")
+  PROXY_SHA256=$(echo "$PROXY_SHA256" | awk '{print $1}')
+  PROXY_SIZE=$(wc -c < "$PROXY_DOWNLOAD" | tr -d ' ')
+
+  if [ "$PROXY_SIZE" -gt 1000 ]; then
+    pass "Downloaded artifact is non-trivial ($PROXY_SIZE bytes)"
+  else
+    fail "Downloaded artifact seems too small ($PROXY_SIZE bytes)"
+  fi
+else
+  fail "Could not extract artifact download path from version detail"
+fi
+section_close
+
+section_open "Test: Proxy artifact download (second request — should serve from cache)"
+if [ -n "${ARTIFACT_PATH:-}" ]; then
+  PROXY_DOWNLOAD2=$(mktemp)
+  HTTP_CODE=$(curl -s -o "$PROXY_DOWNLOAD2" -w '%{http_code}' \
+    "$PROXY_URL$ARTIFACT_PATH")
+  assert_status 200 "$HTTP_CODE" "GET proxy artifact download (cached)"
+
+  PROXY_SHA256_2=$(shasum -a 256 "$PROXY_DOWNLOAD2" 2>/dev/null || sha256sum "$PROXY_DOWNLOAD2")
+  PROXY_SHA256_2=$(echo "$PROXY_SHA256_2" | awk '{print $1}')
+
+  if [ "$PROXY_SHA256" = "$PROXY_SHA256_2" ]; then
+    pass "Cached artifact checksum matches first download"
+  else
+    fail "Cache checksum mismatch: first=$PROXY_SHA256 second=$PROXY_SHA256_2"
+  fi
+  rm -f "$PROXY_DOWNLOAD" "$PROXY_DOWNLOAD2"
+else
+  fail "Skipped — no artifact path"
+fi
+section_close
+
+section_open "Test: Proxy version list (long-form URL)"
+HTTP_CODE=$(curl -s -o "$RESPONSE_FILE" -w '%{http_code}' \
+  "$PROXY_PREFIX/collections/index/$PROXY_NS/$PROXY_NAME/versions/?limit=5")
+assert_status 200 "$HTTP_CODE" "GET proxy version list (long-form URL)"
 section_close
 
 # Cleanup temp files
