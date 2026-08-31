@@ -9,7 +9,7 @@ import org.sonatype.nexus.repository.Format;
 @Singleton
 public class AnsibleGalaxyFormat extends Format {
 
-  public static final String NAME = "ansible-galaxy";
+  public static final String NAME = "ansiblegalaxy";
 
   public AnsibleGalaxyFormat() {
     super(NAME);

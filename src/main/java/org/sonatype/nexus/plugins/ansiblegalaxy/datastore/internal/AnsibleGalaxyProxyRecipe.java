@@ -59,7 +59,7 @@ import static org.sonatype.nexus.repository.http.HttpMethods.*;
 public class AnsibleGalaxyProxyRecipe
     extends RecipeSupport
 {
-  public static final String NAME = "ansible-galaxy-proxy";
+  public static final String NAME = "ansiblegalaxy-proxy";
 
   private static final String PREFIX = "/api/v3/plugin/ansible/content/published";
 

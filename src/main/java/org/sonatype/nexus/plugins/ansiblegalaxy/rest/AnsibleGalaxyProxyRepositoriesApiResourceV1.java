@@ -14,5 +14,5 @@ import static org.sonatype.nexus.plugins.ansiblegalaxy.rest.AnsibleGalaxyProxyRe
 public class AnsibleGalaxyProxyRepositoriesApiResourceV1
     extends AnsibleGalaxyProxyRepositoriesApiResource
 {
-  static final String RESOURCE_URI = RepositoriesApiResourceV1.RESOURCE_URI + "/ansible-galaxy/proxy";
+  static final String RESOURCE_URI = RepositoriesApiResourceV1.RESOURCE_URI + "/ansiblegalaxy/proxy";
 }

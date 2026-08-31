@@ -14,5 +14,5 @@ import static org.sonatype.nexus.plugins.ansiblegalaxy.rest.AnsibleGalaxyHostedR
 public class AnsibleGalaxyHostedRepositoriesApiResourceV1
     extends AnsibleGalaxyHostedRepositoriesApiResource
 {
-  static final String RESOURCE_URI = RepositoriesApiResourceV1.RESOURCE_URI + "/ansible-galaxy/hosted";
+  static final String RESOURCE_URI = RepositoriesApiResourceV1.RESOURCE_URI + "/ansiblegalaxy/hosted";
 }
